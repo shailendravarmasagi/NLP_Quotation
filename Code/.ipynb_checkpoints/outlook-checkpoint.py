@@ -5,7 +5,7 @@ import datetime
 import email.mime.multipart
 import config
 import base64
-from bs4 import BeautifulSoup
+
 
 class Outlook():
     def __init__(self):
@@ -104,7 +104,7 @@ class Outlook():
 
     def unreadIds(self):
         r, d = self.imap.search(None, "UNSEEN")
-        list = d[0].split()
+        list = d[0].split(' ')
         return list
 
     def hasUnread(self):
@@ -113,22 +113,22 @@ class Outlook():
 
     def readIdsToday(self):
         r, d = self.imap.search(None, '(SINCE "'+self.today+'")', 'SEEN')
-        list = d[0].split()
+        list = d[0].split(' ')
         return list
 
     def allIds(self):
         r, d = self.imap.search(None, "ALL")
-        list = d[0].split()
+        list = d[0].split(' ')
         return list
 
     def readIds(self):
         r, d = self.imap.search(None, "SEEN")
-        list = d[0].split()
+        list = d[0].split(' ')
         return list
 
     def getEmail(self, id):
         r, d = self.imap.fetch(id, "(RFC822)")
-        self.raw_email = d[0][1].decode("utf-8")
+        self.raw_email = d[0][1]
         self.email_message = email.message_from_string(self.raw_email)
         return self.email_message
 
@@ -169,30 +169,18 @@ class Outlook():
         if self.email_message.is_multipart():
             for payload in self.email_message.get_payload():
                 # if payload.is_multipart(): ...
-                if "plan" in payload.get_content_type():
-                
-                    body = (
-                        payload.get_payload()
-                        .split(self.email_message['from'])[0]
-                        .split('\r\n\r\n2015')[0]
-                    )
-                    
-                elif "HTML" in payload.get_content_type():
-                      
-                    body = (
-                        BeautifulSoup(payload.get_payload()).get_text()
-                        .split(self.email_message['from'])[0]
-                        .split('\r\n\r\n2015')[0]
-                    )
-                    
-            return body         
-        else:
-                
-            body = (
-                self.email_message.get_payload(None,True)
-                #.split(self.email_message['from'])[0]
-                #.split('\r\n\r\n2015')[0]
+                body = (
+                    payload.get_payload()
+                    .split(self.email_message['from'])[0]
+                    .split('\r\n\r\n2015')[0]
                 )
+                return body
+        else:
+            body = (
+                self.email_message.get_payload()
+                .split(self.email_message['from'])[0]
+                .split('\r\n\r\n2015')[0]
+            )
             return body
 
     def mailsubject(self):
