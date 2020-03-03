@@ -6,9 +6,6 @@ Created on Sun Feb 23 20:24:11 2020
 """
 import re
 import pandas as pd
-from pandas import ExcelWriter
-from pandas import ExcelFile
-import requests
 from bs4 import BeautifulSoup
 import spacy
 from spacy.pipeline import SentenceSegmenter#
@@ -32,7 +29,7 @@ nlp.add_pipe(sbd)
 def get_quote(str_body):
     
     try:
-        x=re.search(r'\nQuote NO: #[\d]{4}\n',str_body.rsplit('Shailendra Varma Sagi <shailu.codepixer@outlook.com>')[1]).group()
+        x=re.search(r'\nQuote NO: #[\d]{4}\n',str_body.rsplit('From: Shailendra Varma Sagi <shailu.codepixer@outlook.com')[1]).group()
     except IndexError:
         return('Invaild body');
     else:
@@ -58,11 +55,11 @@ def get_quote_regex(df_Quotes):
     return(QuoteRegex)    
     
 def get_supplier(str_body):
-    x=re.search(r'\nSupplier Name: [\w{8,16}]*\n',str_body.rsplit('Shailendra Varma Sagi <shailu.codepixer@outlook.com>')[1]).group()
+    x=re.search(r'\nSupplier Name: [\w{8,16}]*\n',str_body.rsplit('From: Shailendra Varma Sagi <shailu.codepixer@outlook.com')[1]).group()
     return(x.replace('\nSupplier Name:','').replace('\n',''))
     
 def get_in_bound_MailBody(body):
-    return(body.rsplit('shailu.codepixer@outlook.com')[0])
+    return(body.rsplit('From: Shailendra Varma Sagi <shailu.codepixer@outlook.com')[0])
     
 def get_item_col_no(df,Quote_regex):
    
@@ -88,7 +85,17 @@ def get_Currency_of_DataFrame(df):
                 return(get_currency(str(col)));
                 break;
     return(0);
-
+    
+def get_cost_Col_Form_header_Table(df):
+    c=0
+    cost_col_no=-1
+    for col in df.columns: 
+        #print(col) 
+        if is_cost(str(col)):
+            cost_col_no=c
+            break;
+        c=c+1
+    return(cost_col_no)
     
 def get_cost_Col_Form_header(df):
     c=0
@@ -115,14 +122,68 @@ def get_Cost_Col_From_row(df):
             c=c+1
     return(cost_col_no);
 
-    
+def get_data_from_Excel_table(df,Quote_regex,df_Quotes,Output_df,supplier,Quote):
+    print(Quote_regex)
+    Count=1
+    item_col_no=get_item_col_no(df,Quote_regex)
+    if item_col_no!=-1:
+        #cost_col_no=get_cost_Col_Form_header_Table(df)
+           #When code headers are given
+        if get_cost_Col_Form_header_Table(df)!=-1:
+            cost_col_no=get_cost_Col_Form_header_Table(df)
+            per_item_col=is_per(str(df.columns[cost_col_no]))
+            Currency=get_currency(str(df.columns[cost_col_no]))
+                #Currency=get_currency(str(list(sub_df.columns.values)[cost_col_no]))
+        elif get_Cost_Col_From_row(df)!=-1:
+            cost_col_no=get_Cost_Col_From_row(df)
+            per_item_col=False
+        else:
+            print('unable to find the cost col')
+        if Currency==0:
+            Currency=get_Currency_of_DataFrame(df)
+        if Currency==0:
+            Currency='$'
+        if cost_col_no!=-1:
+            for index, row in df.iterrows():
+                Received_Quote=False
+                if str(row[item_col_no])!='nan'and str(row[cost_col_no])!='nan' :
+                    if len(re.findall(Quote_regex,row[item_col_no]))==1:
+                        item=re.findall(Quote_regex,row[item_col_no])[0]
+                        per_item_amt=is_per(row[cost_col_no])
+                        if per_item_col or per_item_amt:
+                            Count=int(df_Quotes[ df_Quotes['Description'] == item ]['Count'].iloc[0])
+                             
+                        if len(re.findall(r'[1-9](\d+)*(,\d{1,})*([\.][\d]+)?',row[cost_col_no]))==1:
+                            print(row[cost_col_no])
+                            print(re.search(r'[1-9](\d+)*(,\d{1,})*([\.][\d]+)?',row[cost_col_no]).group())
+                            
+                            Quote_sent=str(round((float(re.search(r'[1-9](\d+)*(,\d{1,})*([\.][\d]+)?',row[cost_col_no]).group().replace(',',''))*int(Count)),2))
+                            if Currency==0 :        
+                                if get_currency(row[cost_col_no]) != 0:
+                                    Quote_sent=get_currency(row[cost_col_no])+Quote_sent
+                                    Received_Quote=True
+                                else:
+                                        print('Unidentified currency please add it to the data base')
+                            else:
+                                Quote_sent=Currency+Quote_sent
+                                Received_Quote=True
+                if Received_Quote==True:                
+                    new_row = {'Supplier Name':supplier, 'QuoteID':Quote, 'Item Name':item,'Quote Sent':Quote_sent}
+                    Output_df=Output_df.append(new_row,ignore_index=True)
+        
+    return(Output_df)           
     
 def get_data_from_table(Html_body,Quote_regex,df_Quotes,Output_df,supplier,Quote):
     print(Quote_regex)
     soup = BeautifulSoup(Html_body, "html.parser")
     for body in soup("tbody"):
         body.unwrap()
-    df = pd.read_html(str(soup), flavor="bs4")
+    try:    
+        df = pd.read_html(str(soup), flavor="bs4")
+    except ValueError:
+        print('No Table found')
+        return(Output_df);
+    
 
     for sub_df in df:
         Count=1
@@ -143,29 +204,30 @@ def get_data_from_table(Html_body,Quote_regex,df_Quotes,Output_df,supplier,Quote
             if cost_col_no!=-1:
                 for index, row in sub_df.iterrows():
                     Received_Quote=False
-                    if len(re.findall(Quote_regex,row[item_col_no]))==1:
-                        item=re.findall(Quote_regex,row[item_col_no])[0]
-                        per_item_amt=is_per(row[cost_col_no])
-                        if per_item_col or per_item_amt:
-                             Count=int(df_Quotes[ df_Quotes['Description'] == item ]['Count'].iloc[0])
-                             
-                        if len(re.findall(r'[1-9](\d+)*(,\d{1,})*([\.][\d]+)?',row[cost_col_no]))==1:
-                            print(row[cost_col_no])
-                            print(re.search(r'[1-9](\d+)*(,\d{1,})*([\.][\d]+)?',row[cost_col_no]).group())
-                            
-                            Quote_sent=str(round((float(re.search(r'[1-9](\d+)*(,\d{1,})*([\.][\d]+)?',row[cost_col_no]).group().replace(',',''))*int(Count)),2))
-                            if Currency==0 :        
-                                if get_currency(row[cost_col_no]) != 0:
-                                        Quote_sent=get_currency(row[cost_col_no])+Quote_sent
-                                        Received_Quote=True
+                    if str(row[item_col_no])!='nan'and str(row[cost_col_no])!='nan' :
+                        if len(re.findall(Quote_regex,row[item_col_no]))==1:
+                            item=re.findall(Quote_regex,row[item_col_no])[0]
+                            per_item_amt=is_per(row[cost_col_no])
+                            if per_item_col or per_item_amt:
+                                 Count=int(df_Quotes[ df_Quotes['Description'] == item ]['Count'].iloc[0])
+                                 
+                            if len(re.findall(r'[1-9](\d+)*(,\d{1,})*([\.][\d]+)?',row[cost_col_no]))==1:
+                                print(row[cost_col_no])
+                                print(re.search(r'[1-9](\d+)*(,\d{1,})*([\.][\d]+)?',row[cost_col_no]).group())
+                                
+                                Quote_sent=str(round((float(re.search(r'[1-9](\d+)*(,\d{1,})*([\.][\d]+)?',row[cost_col_no]).group().replace(',',''))*int(Count)),2))
+                                if Currency==0 :        
+                                    if get_currency(row[cost_col_no]) != 0:
+                                            Quote_sent=get_currency(row[cost_col_no])+Quote_sent
+                                            Received_Quote=True
+                                    else:
+                                        print('Unidentified currency please add it to the data base')
                                 else:
-                                    print('Unidentified currency please add it to the data base')
-                            else:
-                                Quote_sent=Currency+Quote_sent
-                                Received_Quote=True
-                    if Received_Quote==True:                
-                        new_row = {'Supplier Name':supplier, 'QuoteID':Quote, 'Item Name':item,'Quote Sent':Quote_sent}
-                        Output_df=Output_df.append(new_row,ignore_index=True)
+                                    Quote_sent=Currency+Quote_sent
+                                    Received_Quote=True
+                        if Received_Quote==True:                
+                            new_row = {'Supplier Name':supplier, 'QuoteID':Quote, 'Item Name':item,'Quote Sent':Quote_sent}
+                            Output_df=Output_df.append(new_row,ignore_index=True)
         
     return(Output_df)       
         
@@ -236,7 +298,7 @@ def get_data_from_body(srt_body,QuoteRegex,df_Quotes,Output_df,supplier,Quote):
                 
                 else:
                     print("Too many regex strings in the statement")
-                return(Output_df)
+    return(Output_df)
 
     
     
