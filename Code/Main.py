@@ -2,6 +2,11 @@ import ReadMail
 import Quote
 import pandas as pd
 import PyPDF2
+'''import config'''
+from configparser import ConfigParser
+configur = ConfigParser()
+configur.read('Config.Ini')
+
 #import trail
 #import tabula
 #import camelot
@@ -23,10 +28,10 @@ for Message in Messages:
     nbrOfAttachmentInMessage = subFolderItemAttachments.Count
     for attachment in subFolderItemAttachments:
         if '.xlsx' in str(attachment):
-            attachment.SaveAsFile('C:\\Users\\slice\\NLP POC\\NLP_Quotation\\OutPut' + '\\'+ attachment.FileName)
-            xls = pd.ExcelFile('C:\\Users\\slice\\NLP POC\\NLP_Quotation\\OutPut' + '\\'+ attachment.FileName)
+            attachment.SaveAsFile(configur.get('FilePath','OutputFolder') + '\\'+ attachment.FileName)
+            xls = pd.ExcelFile(configur.get('FilePath','OutputFolder') + '\\'+ attachment.FileName)
             for sheet in xls.sheet_names:
-                df = pd.read_excel('C:\\Users\\slice\\NLP POC\\NLP_Quotation\\OutPut' + '\\'+ attachment.FileName, sheet_name=sheet, dtype=str)
+                df = pd.read_excel(configur.get('FilePath','OutputFolder') + '\\'+ attachment.FileName, sheet_name=sheet, dtype=str)
                 print(df)
                 if Output_df.empty:
                     before_count=0
@@ -40,9 +45,9 @@ for Message in Messages:
                 if after_count>before_count:
                     Out_Falg=True
         elif '.pdf' in str(attachment):
-            attachment.SaveAsFile('C:\\Users\\slice\\NLP POC\\NLP_Quotation\\OutPut' + '\\'+ attachment.FileName)
+            attachment.SaveAsFile(configur.get('FilePath','OutputFolder')+ '\\'+ attachment.FileName)
             #'df=camelot.read_pdf('C:\\Users\\slice\\NLP POC\\NLP_Quotation\\OutPut' + '\\'+ attachment.FileName)
-            pdf_file='C:\\Users\\slice\\NLP POC\\NLP_Quotation\\OutPut' + '\\'+ attachment.FileName
+            pdf_file=configur.get('FilePath','OutputFolder') + '\\'+ attachment.FileName
             #pdfparser(pdf_file)
             #x=trail.extractPdfText(pdf_file)
             pdfFileObj = open(pdf_file, 'rb')
@@ -73,7 +78,7 @@ for Message in Messages:
         InBody=Quote.get_in_bound_MailBody(Str_Body)
         Output_df=Quote.get_data_from_body(InBody,Quote_Regex,df_Quotes,Output_df,supplier,str_quote)
 print(Output_df)
-writer = pd.ExcelWriter('C:\\Users\\slice\\NLP POC\\NLP_Quotation\\OutPut\\output.xlsx')
+writer = pd.ExcelWriter(configur.get('FilePath','OutputFolder')+'\\output.xlsx')
 Output_df.to_excel(writer)
 writer.save()
 

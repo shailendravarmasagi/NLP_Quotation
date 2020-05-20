@@ -6,7 +6,9 @@ Created on Sun Feb 23 20:02:07 2020
 
 """
 import win32com.client
-
+from configparser import ConfigParser
+configur = ConfigParser()
+configur.read('Config.Ini')
 def get_Mail_Messages():
     outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
 
@@ -20,7 +22,7 @@ def get_Mail_Messages():
     
         print("*************************************************")
         for folder1 in folder.Folders:
-            if str(folder1)=='POC':
+            if str(folder1)==configur.get('Outlook','InputFolder'):
                 req_folder=folder1
     Messages = req_folder.Items
     return(Messages)

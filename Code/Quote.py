@@ -10,7 +10,9 @@ from bs4 import BeautifulSoup
 import spacy
 from spacy.pipeline import SentenceSegmenter#
 nlp = spacy.load('en_core_web_sm')
-
+from configparser import ConfigParser
+configur = ConfigParser()
+configur.read('Config.Ini')
 def split_on_newlines(doc):
     start = 0 
     seen_newline = False
@@ -37,7 +39,7 @@ def get_quote(str_body):
          
 def get_df_quote(Quote):
     
-        df_Quotes = pd.read_excel('C:\\Users\\slice\\NLP POC\\NLP_Quotation\\Input\\Quotes.xlsx')
+        df_Quotes = pd.read_excel(configur.get('FilePath','InputFolder')+'\\Quotes.xlsx')
         df_Quotes = df_Quotes[ df_Quotes['Quote Sent'] == int(Quote) ]
         return(df_Quotes)
 
@@ -326,7 +328,7 @@ def get_nearest_no(text):
         
 def is_per(text):
     Flag=0
-    df_strings= pd.read_excel('C:\\Users\\slice\\NLP POC\\NLP_Quotation\\Input\\per.xlsx')
+    df_strings= pd.read_excel(configur.get('FilePath','InputFolder')+'\\per.xlsx')
     for index, row in df_strings.iterrows():
         if str(row['String']).lower() in text.lower():
             Flag=1
@@ -339,7 +341,7 @@ def get_currency(text):
     if isNumber(text):
         return 0;
     else:
-        df_Symbols = pd.read_excel('C:\\Users\\slice\\NLP POC\\NLP_Quotation\\Input\\Currency Symbols.xlsx')
+        df_Symbols = pd.read_excel(configur.get('FilePath','InputFolder')+'\\Currency Symbols.xlsx')
         for index, row in df_Symbols.iterrows():
             if str(row['Text']).lower() in text.lower():
                 Flag=1
@@ -352,7 +354,7 @@ def is_cost(text):
     Flag=0
     if isNumber(text):
         return False;
-    df_strings= pd.read_excel('C:\\Users\\slice\\NLP POC\\NLP_Quotation\\Input\\Cost.xlsx')
+    df_strings= pd.read_excel(configur.get('FilePath','InputFolder')+'\\Cost.xlsx')
     for index, row in df_strings.iterrows():
         if str(row['String']).lower() in text.lower():
             Flag=1
